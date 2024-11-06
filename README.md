@@ -10,7 +10,7 @@ This project is currently in development. The following features are not fully i
 - **Tags and Categories**: Support for tags and categories to organize posts.
 - **Notes for Posts**: Ability to add internal notes to posts (for administrative use).
 - **Post Filtering**: Options to filter posts based on criteria like tags, categories, and author.
-
+- **Comprehensive Testing**: Unit and integration tests for improving service reliability.
 
 
 ## Project Structure
