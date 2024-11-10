@@ -6,11 +6,9 @@ This project is a basic REST API server for managing social media posts. The ser
 
 This project is currently in development. The following features are not fully implemented:
 
-- **Post Editing Permissions**: Only the author of a post should be able to edit it.
-- **Tags and Categories**: Support for tags and categories to organize posts.
-- **Notes for Posts**: Ability to add internal notes to posts (for administrative use).
 - **Post Filtering**: Options to filter posts based on criteria like tags, categories, and author.
 - **Comprehensive Testing**: Unit and integration tests for improving service reliability.
+- **Likes and views**: Users can like and comment
 
 
 ## Project Structure
@@ -23,10 +21,34 @@ The API interacts with `Post` objects, which have the following structure:
 
 ```go
 type Post struct {
-    ID      int    `db:"id" json:"ID"`
-    Title   string `db:"title" json:"title"`
-    Content string `db:"content" json:"content"`
-    Author  string `db:"author" json:"author"`
-    Visible bool   `db:"visible" json:"visible"`
-    User    string `db:"user" json:"user"`
+	ID int `db:"id" json:"ID"`
+
+	Title    string         `db:"title" json:"title"`
+	Content  string         `db:"content" json:"content"`
+	Author   string         `db:"author" json:"author"`
+	Visible  bool           `db:"visible" json:"visible"`
+	Note     string         `db:"note" json:"note"`
+	Tags     pq.StringArray `db:"tags" json:"tags"`
+	Category pq.StringArray `db:"category" json:"category"`
+	Likes    int
+	Views    int
+
+	Username string `db:"username" json:"username"`
+}
+
+```
+# `Create` request might look like this:
+```
+localhost:8080/create
+```
+```json
+{
+    "id": 8,
+    "title": "A sadasdsdiadasdasdfsdfsdfdsfniasdasdasdmalism",
+    "content": "Mini23nal living.",
+    "author": "Et4",
+    "visible": false,
+    "note": "Learnin5g to livef with less.",
+    "tags": ["Minim6alism", "Lifestyle", "Simplficity"],
+    "category": ["Lifest7yle", "Self-impr8ovefgment"]
 }
