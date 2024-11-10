@@ -12,13 +12,15 @@ import (
 
 func HandlerRegister(dbUser *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryParams := r.URL.Query()
-		username := queryParams.Get("username")
-		password := queryParams.Get("password")
-		err := db.InsertToDB(dbUser, db.User{
-			Username: username,
-			Password: password,
-		})
+		u, err := db.ParsingLogReg(r)
+		if u.Username == "" || u.Password == "" {
+			w.Write([]byte("empty username or password"))
+			return
+		}
+		if err != nil {
+			log.Fatalf("Error while parsing user: %v", err)
+		}
+		err = db.InsertToDB(dbUser, u)
 		if err != nil {
 			log.Println("Error while inserting user to DB: %v", err)
 			err := fmt.Sprintf("Error while inserting user to DB: %v", err)
@@ -28,14 +30,19 @@ func HandlerRegister(dbUser *sqlx.DB) http.HandlerFunc {
 }
 func HandlerLogin(dbUser *sqlx.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryParams := r.URL.Query()
-		username := queryParams.Get("username")
-		password := queryParams.Get("password")
-		result, b := db.LoginUser(dbUser, db.User{
-			Username: username,
-			Password: password,
-		})
-
+		u, err := db.ParsingLogReg(r)
+		if err != nil {
+			log.Fatalf("Error while parsing user: %v", err)
+		}
+		if u.Username == "" || u.Password == "" {
+			w.Write([]byte("empty username or password"))
+			return
+		}
+		result, b := db.LoginUser(dbUser, u)
+		if !b {
+			w.Write([]byte("wrong username or password"))
+			return
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "JWTtoken",
 			Value:    *result,
@@ -87,30 +94,82 @@ func main() {
 
 func HandleCreatePost(w http.ResponseWriter, r *http.Request) {
 	post := posts.ParsePost(r)
-	err := posts.CreatePost(*post)
+	cookie, err := r.Cookie("JWTtoken")
 	if err != nil {
-		log.Println("Error while creating post: %v", err)
+		return
+	}
+	jwt, err := jwtToken.ParseJWT(cookie.Value)
+	if err != nil {
+		return
+	}
+	id := posts.CreatePost(*post, jwt)
+	if id == -1 {
+		log.Println("Error while creating post")
+	}
+	_, err = fmt.Fprint(w, id)
+	if err != nil {
+		return
 	}
 }
 
 func HandleUpdatePost(w http.ResponseWriter, r *http.Request) {
 	post := posts.ParsePost(r)
-	err := posts.UpdatePost(*post)
+	postS := *post
+	postForUpdate, err := posts.ReadPost(&postS)
 	if err != nil {
-		log.Println("Error while updating post: %v", err)
+		log.Println("Error while reading post: %v", err)
+	}
+	if !CheckUserValid(r, &postForUpdate) {
+		http.Error(w, "no access", http.StatusForbidden)
+		return
+	}
+	err = posts.UpdatePost(*post)
+	if err != nil {
+		fmt.Fprintf(w, "Error while updating post: %v", err)
+	} else {
+		fmt.Fprint(w, http.StatusOK)
 	}
 }
 
 func HandleReadPost(w http.ResponseWriter, r *http.Request) {
 	post := posts.ParsePost(r)
-	s, err := posts.ReadPost(*post)
+	s, err := posts.ReadPost(post)
 	if err != nil {
 		log.Println("Error while reading post: %v", err)
+	}
+	if post.Visible == false {
+		if !CheckUserValid(r, post) {
+			http.Error(w, "no access", http.StatusForbidden)
+			return
+		}
 	}
 	fmt.Fprint(w, s)
 }
 
 func HandleDeletePost(w http.ResponseWriter, r *http.Request) {
 	post := posts.ParsePost(r)
+	postS := *post
+	postForDelete, err := posts.ReadPost(&postS)
+	if err != nil {
+		fmt.Errorf("error while reading the post")
+	}
+	if !CheckUserValid(r, &postForDelete) {
+		http.Error(w, "no access", http.StatusForbidden)
+		return
+	}
 	posts.DeletePost(*post)
+	fmt.Fprint(w, http.StatusOK)
+}
+
+func CheckUserValid(r *http.Request, post *posts.Post) bool {
+	cookie, err := r.Cookie("JWTtoken")
+	if err != nil {
+		fmt.Errorf("error while getting cookie: %v", err)
+		return false
+	}
+	if jwtUserName, _ := jwtToken.ParseJWT(cookie.Value); jwtUserName != post.Username {
+		fmt.Errorf("error user is not the author of post")
+		return false
+	}
+	return true
 }

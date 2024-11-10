@@ -3,11 +3,13 @@ package db
 import (
 	"awesomeProject/hash"
 	jwtToken "awesomeProject/pkg/jwt"
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"log"
+	"net/http"
 )
 
 type User struct {
@@ -64,4 +66,13 @@ func LoginUser(db *sqlx.DB, user User) (*string, bool) {
 	}
 
 	return nil, false
+}
+
+func ParsingLogReg(r *http.Request) (User, error) {
+	u := User{}
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		log.Fatalf("Error while parsing user: %v", err)
+		return User{}, nil
+	}
+	return u, nil
 }
